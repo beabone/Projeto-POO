@@ -14,7 +14,7 @@ class Cliente:
     def adicionar_cliente(self, cliente):
         self.clientes.append (cliente)
         
-    def total_compra(self,):
+    def total_compra(self,preço,):
 
 class Compra:
     def _init_(self, data_compra, cliente_associado, produtos_comprados, status):
