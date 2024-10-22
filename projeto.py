@@ -1,29 +1,41 @@
-class Produto:
-    def _init_ (self, produto, preço, marca, estoque_disponivel):
-        self.nome = nome
-        self.preco = preço
-        self.categoria = marca
-        self.estoque_disponivel = estoque_disponivel
-    
-class Cliente:
-    def _init_(self, nome, telefone, historico_de_compras, produto, preço, marca, estoque_disponivel):
-        super()._init_(produto, preço, marca, estoque_disponivel)
-        self.nome = nome
-        self.telefone = telefone
-        self.historico_de_compras = []
-    
-    def adicionar_compra(self, compra):
-        self.historico_de_compras.append(compra)
-        
-    def total_compras (self):
-        return sum(compra.calcular_total() for compra in self.historico_de_compras)
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship, sessionmaker, declarative_base
 
-class Compra:
-    def _init_(self, data_compra, cliente_associado, produtos_comprados, status):
-        self.data_compra = data_compra
-        self.cliente_associado = cliente_associado
-        self.produtos_comprados = produtos_comprados
-        self.status = status
+engine = create_engine('sqlite:///biblioteca.db')
+Session = sessionmaker(bind=engine)
+session = Session()
+
+class Produto:
+   __tablename__ = 'Produtos'
+   
+   id = Column 
+   nome = Column
+   preço = Column
+   marca = Column
+   estoque_disponivel = Column
+
     
-    def calcular_total(self):
+class Cliente(Produto):
+    __tablename__ = 'Clientes'
+    
+    cpf =  Column
+    nome = Column
+    telefone = Column
+    historico_de_compras = Column
+    produto_id = Column
+    produto = relationship ('Produto', backref = 'clientes')
+    
+Base.metadata.create_all(engine)
+    
+def adicionar_produto(produto_nome, preço, marca, estoque_disponivel):
+    produto = session.query(Produto).filter_by(nome= produto_nome).first()
+    if not produto:
+        print(f'Produto "{produto_nome}" não encontrado.')
+        return
+    
+    produto = Produto(produto = produto)
+    session.add(produto)
+    session.commit()
+    
+def 
         return sum(produto.preço for produto in self.produtos_comprados)
