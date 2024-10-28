@@ -107,6 +107,47 @@ def realizar_pedido(cliente_id, produtos_quantidade):
 def consultar_pedidos(cliente_id):
     return session.query(Pedido).filter_by(cliente_id=cliente_id).all()
 
+def atualizar_estoque(produto_id, nova_quantidade):
+    produto = session.query(Produto).get(produto_id)
+    if not produto:
+        print("Produto não encontrado.")
+        return
+    produto.estoque = nova_quantidade
+    session.commit()
+    print(f'Estoque do produto {produto.nome} atualizado para {nova_quantidade}.')
+
+def cancelar_compra(id_produto):
+    pedido = session.query(Pedido).get(id_pedido):
+    if not pedido:
+        print("Pedido não encontrado.")
+        return
+
+    if pedido.status != 'Pendente':
+        print("O pedido não pode ser cancelado, pois já foi processado.")
+        return
+
+    if session.query(Pagamento).filter_by(pedido_id=pedido.id).count() == 0:
+        for produto_pedido in pedido.produtos:
+            produto = session.query(Produto).get(produto_pedido.produto_id)
+            produto.estoque += produto_pedido.quantidade
+
+        pedido.status = 'Cancelado'
+        session.commit()
+        print(f'Pedido ID {pedido_id} cancelado automaticamente, pois não houve pagamento.')
+    else:
+    
+        confirmacao = input(f'Deseja cancelar o pedido ID {pedido_id}? (sim/nao): ')
+        if confirmacao.lower() == 'sim':
+            for produto_pedido in pedido.produtos:
+            produto = session.query(Produto).get(produto_pedido.produto_id)
+            produto.estoque += produto_pedido.quantidade
+
+            pedido.status = 'Cancelado'
+            session.commit()
+            print(f'Pedido ID {pedido_id} cancelado com sucesso.')
+        else:
+            print("Cancelamento do pedido foi abortado.")
+  
 def main():
     while True:
         print('\nEscolha uma opção:')
@@ -115,7 +156,9 @@ def main():
         print('3. Consultar Produtos')
         print('4. Realizar Pedido')
         print('5. Consultar Pedidos')
-        print('6. Sair')
+        print('6. Atualizar estoque')
+        print('7. Cancelar pedido')
+        print('8. Sair')
 
         opcao = input('Opção: ')
         if opcao == '1':
@@ -151,10 +194,16 @@ def main():
             pedidos = consultar_pedidos(cliente_id)
             for pedido in pedidos:
                 print(f'Pedido ID: {pedido.id}, Valor Total: {pedido.valor_total}, Status: {pedido.status}')
-        elif opcao == '6':
+       elif opcao == '6':
+            produto_id = int(input('ID do Produto a ser atualizado: '))
+            nova_quantidade = int(input('Nova quantidade em estoque: '))
+            atualizar_estoque(produto_id, nova_quantidade)
+        elif opcao == '7':
+            pedido_id = int(input('ID do Pedido a ser cancelado: '))
+            cancelar_pedido(pedido_id)
+        elif opcao == '8':
             break
         else:
             print('Opção inválida. Tente novamente.')
-
 if __name__ == "__main__":
     main()
