@@ -84,26 +84,6 @@ def consultar_produtos(filtro=None):
         query = query.filter(Produto.nome.ilike(f'%{filtro}%'))
     return query.all()
 
-def realizar_pedido(cliente_id, produtos_quantidade):
-    cliente = session.query(Cliente).get(cliente_id)
-    if not cliente:
-        print("Cliente não encontrado.")
-        return
-    
-    pedido = Pedido(cliente=cliente, status='Pendente', valor_total=0)
-    for produto_id, quantidade in produtos_quantidade.items():
-        produto = session.query(Produto).get(produto_id)
-        if produto and produto.estoque >= quantidade:
-            produto_pedido = ProdutoPedido(pedido=pedido, produto=produto, quantidade=quantidade)
-            pedido.valor_total += produto.preco * quantidade
-            produto.estoque -= quantidade
-            session.add(produto_pedido)
-        else:
-            print(f'Produto {produto_id} não disponível ou estoque insuficiente.')
-
-    session.add(pedido)
-    session.commit()
-
 def consultar_pedidos(cliente_id):
     return session.query(Pedido).filter_by(cliente_id=cliente_id).all()
 
@@ -121,16 +101,15 @@ def atualizar_estoque(produto_id, nova_quantidade):
     session.commit()
     print(f'Estoque do produto {produto.nome} atualizado para {nova_quantidade}.')
 
-def realizar_pagamento(pedido_id):
+def status_pagamento(pedido_id):
     pedido = session.query(Pedido).get(pedido_id)
     if not pedido:
         print("Pedido não encontrado.")
         return
 
-    if pedido.status != 'Pendente':
-        print("O pedido não pode ser pago, pois não está pendente.")
-        return
-
+    if pedido.id == 'Pendente':
+        print('Pedido pendente, esta aguardando pagamento ou esta sendo processado')
+        
     valor_pago = float(input(f'Valor a ser pago {pedido_id} (Valor Total: {pedido.valor_total}): '))
     
     if valor_pago <= 0:
@@ -173,17 +152,6 @@ def cancelar_pedido(id_pedido):
         pedido.status = 'Cancelado'
         session.commit()
         print(f'Pedido ID {id_pedido} cancelado automaticamente, pois não houve pagamento.')
-    else:
-    
-        confirmacao = input(f'Deseja cancelar o pedido ID {id_pedido}? (sim/nao): ')
-        if confirmacao.lower() == 'sim':
-            for produto_pedido in pedido.produtos:
-                produto = session.query(Produto).get(produto_pedido.produto_id)
-                produto.estoque += produto_pedido.quantidade
-
-                pedido.status = 'Cancelado'
-                session.commit()
-                print(f'Pedido ID {id_pedido} cancelado com sucesso.')
         else:
             print("Cancelamento do pedido foi abortado.")
 
