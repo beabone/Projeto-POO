@@ -121,6 +121,40 @@ def atualizar_estoque(produto_id, nova_quantidade):
     session.commit()
     print(f'Estoque do produto {produto.nome} atualizado para {nova_quantidade}.')
 
+def realizar_pagamento(pedido_id):
+    pedido = session.query(Pedido).get(pedido_id)
+    if not pedido:
+        print("Pedido não encontrado.")
+        return
+
+    if pedido.status != 'Pendente':
+        print("O pedido não pode ser pago, pois não está pendente.")
+        return
+
+    valor_pago = float(input(f'Valor a ser pago {pedido_id} (Valor Total: {pedido.valor_total}): '))
+    
+    if valor_pago <= 0:
+        print("Pagamento inválido. O pedido será cancelado.")
+        pedido.status = 'Cancelado'
+        cancelar_pedido(pedido_id)
+        return
+
+    metodo_pagamento = input("Método de pagamento (Ex: Cartão, Dinheiro e Pix): ")
+
+    pedido.status = 'Pago'
+    session.commit()
+    print(f'Pagamento realizado com sucesso para o Pedido: {pedido_id}.')
+
+def excluir_produto(produto_id):
+    produto = session.query(Produto).get(produto_id)
+    if not produto:
+        print("Produto não encontrado.")
+        return
+    
+    session.delete(produto)
+    session.commit()
+    print(f'Produto ID {produto_id} foi excluído.')
+
 def cancelar_pedido(id_pedido):
     pedido = session.query(Pedido).get(id_pedido)
     if not pedido:
@@ -128,7 +162,7 @@ def cancelar_pedido(id_pedido):
         return
 
     if pedido.status != 'Pendente':
-        print("O pedido não pode ser cancelado, pois já foi processado.")
+        print("O pedido não pode ser cancelado, pois já foi ou esta sendo processado processado.")
         return
 
     if session.query(Pagamento).filter_by(pedido_id=pedido.id).count() == 0:
@@ -152,6 +186,19 @@ def cancelar_pedido(id_pedido):
                 print(f'Pedido ID {id_pedido} cancelado com sucesso.')
         else:
             print("Cancelamento do pedido foi abortado.")
+
+def excluir_conta(cliente_id):
+    cliente = session.query(Cliente).get(cliente_id)
+    if not cliente:
+        print("Cliente não encontrado.")
+        return
+    
+    for pedido in cliente.pedidos:
+        session.delete(pedido)
+    
+    session.delete(cliente)
+    session.commit()
+    print(f'Conta do cliente ID: {cliente_id} excluída com sucesso.')
   
 def main():
     while True:
@@ -206,10 +253,19 @@ def main():
             produto_id = int(input('ID do Produto a ser atualizado: '))
             nova_quantidade = int(input('Nova quantidade em estoque: '))
             atualizar_estoque(produto_id, nova_quantidade)
-        elif opcao == '8':
+        elif opcao == '8':  
+            pedido_id = int(input('ID do Pedido a ser pago: '))
+            realizar_pagamento(pedido_id)
+        elif opcao == '9': 
+            produto_id = int(input('ID do Produto a ser excluído: '))
+            excluir_produto(produto_id)
+        elif opcao == '10':
             pedido_id = int(input('ID do Pedido a ser cancelado: '))
             cancelar_pedido(pedido_id)
-        elif opcao == '9':
+        elif opcao == '11':  
+            cliente_id = int(input('ID do Cliente a ser excluído: '))
+            excluir_conta(cliente_id)
+        elif opcao == '12':
             break
         else:
             print('Opção inválida. Tente novamente.')
