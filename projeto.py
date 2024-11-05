@@ -84,6 +84,39 @@ def consultar_produtos(filtro=None):
         query = query.filter(Produto.nome.ilike(f'%{filtro}%'))
     return query.all()
 
+def realizar_pedido(cliente_id, produtos_quantidades):
+    cliente = session.query(Cliente).get(cliente_id)
+    if not cliente:
+        print("Cliente não encontrado.")
+        return
+
+    produtos = []
+    valor_total = 0
+    for produto_id, quantidade in produtos_quantidades.items():
+        produto = session.query(Produto).get(produto_id)
+        if not produto:
+            print(f"Produto ID {produto_id} não encontrado.")
+            return
+        if produto.estoque < quantidade:
+            print(f"Estoque insuficiente para o produto {produto.nome}. Estoque disponível: {produto.estoque}")
+            return
+        produtos.append((produto, quantidade))
+        valor_total += produto.preco * quantidade
+
+    pedido = Pedido(cliente_id=cliente.id, valor_total=valor_total, status='Pendente')
+    session.add(pedido)
+    session.commit()  
+
+    for produto, quantidade in produtos:
+        produto_pedido = ProdutoPedido(pedido_id=pedido.id, produto_id=produto.id, quantidade=quantidade)
+        session.add(produto_pedido)
+
+        produto.estoque -= quantidade
+
+    session.commit()  
+
+    print(f"Pedido realizado com sucesso! Pedido ID: {pedido.id}, Valor total: R${valor_total:.2f}")
+
 def consultar_pedidos(cliente_id):
     return session.query(Pedido).filter_by(cliente_id=cliente_id).all()
 
@@ -113,16 +146,16 @@ def status_pagamento(pedido_id):
     valor_pago = float(input(f'Valor a ser pago {pedido_id} (Valor Total: {pedido.valor_total}): '))
     
     if valor_pago <= 0:
-        print("Pagamento inválido. O pedido será cancelado.")
         pedido.status = 'Cancelado'
         cancelar_pedido(pedido_id)
+        print(f'O Status do pedido: {pedido_id} é CANCELADO')
         return
 
     metodo_pagamento = input("Método de pagamento (Ex: Cartão, Dinheiro e Pix): ")
 
     pedido.status = 'Pago'
     session.commit()
-    print(f'Pagamento realizado com sucesso para o Pedido: {pedido_id}.')
+    print(f'O Status do pedido: {pedido_id} é PAGO')
 
 def excluir_produto(produto_id):
     produto = session.query(Produto).get(produto_id)
