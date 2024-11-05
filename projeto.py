@@ -154,6 +154,7 @@ def status_pagamento(pedido_id):
     metodo_pagamento = input("Método de pagamento (Ex: Cartão, Dinheiro e Pix): ")
 
     pedido.status = 'Pago'
+    pagamento = Pagamento(pedido_id=pedido.id, valor_pago=valor_pago, metodo_pagamento=metodo_pagamento)
     session.commit()
     print(f'O Status do pedido: {pedido_id} é PAGO')
 
