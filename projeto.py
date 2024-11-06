@@ -69,14 +69,24 @@ class Pagamento(Base):
 Base.metadata.create_all(engine)
 
 def adicionar_produto(nome, categoria, preco, descricao, estoque):
-    produto = Produto(nome=nome, categoria=categoria, preco=preco, descricao=descricao, estoque=estoque)
-    session.add(produto)
-    session.commit()
+    try:
+        produto = Produto(nome=nome, categoria=categoria, preco=preco, descricao=descricao, estoque=estoque)
+        session.add(produto)
+        session.commit()
+        print(f'Produto {nome} adicionado com sucesso.')
+    except Exception as e:
+        session.rollback()
+        print(f"Erro ao adicionar produto: {e}")
 
 def adicionar_cliente(nome, endereco, email, telefone):
-    cliente = Cliente(nome=nome, endereco=endereco, email=email, telefone=telefone)
-    session.add(cliente)
-    session.commit()
+    try:
+        cliente = Cliente(nome=nome, endereco=endereco, email=email, telefone=telefone)
+        session.add(cliente)
+        session.commit()
+        print(f'Cliente {nome} adicionado com sucesso.')
+    except Exception as e:
+        session.rollback()
+        print(f"Erro ao adicionar cliente: {e}")
 
 def consultar_produtos(filtro=None):
     query = session.query(Produto)
@@ -85,37 +95,39 @@ def consultar_produtos(filtro=None):
     return query.all()
 
 def realizar_pedido(cliente_id, produtos_quantidades):
-    cliente = session.query(Cliente).get(cliente_id)
-    if not cliente:
-        print("Cliente não encontrado.")
-        return
+    try:
+        cliente = session.query(Cliente).get(cliente_id)
+        if not cliente:
+            raise ValueError("Cliente não encontrado.")
 
-    produtos = []
-    valor_total = 0
-    for produto_id, quantidade in produtos_quantidades.items():
-        produto = session.query(Produto).get(produto_id)
-        if not produto:
-            print(f"Produto ID {produto_id} não encontrado.")
-            return
-        if produto.estoque < quantidade:
-            print(f"Estoque insuficiente para o produto {produto.nome}. Estoque disponível: {produto.estoque}")
-            return
-        produtos.append((produto, quantidade))
-        valor_total += produto.preco * quantidade
+        produtos = []
+        valor_total = 0
+        for produto_id, quantidade in produtos_quantidades.items():
+            produto = session.query(Produto).get(produto_id)
+            if not produto:
+                raise ValueError(f"Produto ID {produto_id} não encontrado.")
+            if produto.estoque < quantidade:
+                raise ValueError(f"Estoque insuficiente para o produto {produto.nome}. Estoque disponível: {produto.estoque}")
+            
+            produtos.append((produto, quantidade))
+            valor_total += produto.preco * quantidade
 
-    pedido = Pedido(cliente_id=cliente.id, valor_total=valor_total, status='Pendente')
-    session.add(pedido)
-    session.commit()  
+        pedido = Pedido(cliente_id=cliente.id, valor_total=valor_total, status='Pendente')
+        session.add(pedido)
+        session.commit()  
 
-    for produto, quantidade in produtos:
-        produto_pedido = ProdutoPedido(pedido_id=pedido.id, produto_id=produto.id, quantidade=quantidade)
-        session.add(produto_pedido)
+        for produto, quantidade in produtos:
+            produto_pedido = ProdutoPedido(pedido_id=pedido.id, produto_id=produto.id, quantidade=quantidade)
+            session.add(produto_pedido)
+            produto.estoque -= quantidade
 
-        produto.estoque -= quantidade
-
-    session.commit()  
-
-    print(f"Pedido realizado com sucesso! Pedido ID: {pedido.id}, Valor total: R${valor_total:.2f}")
+        session.commit()
+        print(f"Pedido realizado com sucesso! Pedido ID: {pedido.id}, Valor total: R${valor_total:.2f}")
+    except ValueError as ve:
+        print(f"Erro: {ve}")
+    except Exception as e:
+        session.rollback()
+        print(f"Erro ao realizar pedido: {e}")
 
 def consultar_pedidos(cliente_id):
     return session.query(Pedido).filter_by(cliente_id=cliente_id).all()
@@ -126,68 +138,90 @@ def consultar_clientes():
         print(f'ID: {cliente.id}, Nome: {cliente.nome}, Email: {cliente.email}')
 
 def atualizar_estoque(produto_id, nova_quantidade):
-    produto = session.query(Produto).get(produto_id)
-    if not produto:
-        print("Produto não encontrado.")
-        return
-    produto.estoque = nova_quantidade
-    session.commit()
-    print(f'Estoque do produto {produto.nome} atualizado para {nova_quantidade}.')
+    try:
+        produto = session.query(Produto).get(produto_id)
+        if not produto:
+            raise ValueError("Produto não encontrado.")
+        if nova_quantidade < 0:
+            raise ValueError("A quantidade em estoque não pode ser negativa.")
+        
+        produto.estoque = nova_quantidade
+        session.commit()
+        print(f'Estoque do produto {produto.nome} atualizado para {nova_quantidade}.')
+    except ValueError as ve:
+        print(f"Erro: {ve}")
+    except Exception as e:
+        session.rollback()
+        print(f"Erro ao atualizar estoque: {e}")
 
 def status_pagamento(pedido_id):
-    pedido = session.query(Pedido).get(pedido_id)
-    if not pedido:
-        print("Pedido não encontrado.")
-        return
+    try:
+        pedido = session.query(Pedido).get(pedido_id)
+        if not pedido:
+            raise ValueError("Pedido não encontrado.")
+        if pedido.status != 'Pendente':
+            print("O pedido já foi processado ou está em outro status.")
+            return
 
-    if pedido.id == 'Pendente':
-        print('Pedido pendente, esta aguardando pagamento ou esta sendo processado')
-        
-    valor_pago = float(input(f'Valor a ser pago {pedido_id} (Valor Total: {pedido.valor_total}): '))
-    
-    if valor_pago <= 0:
-        pedido.status = 'Cancelado'
-        cancelar_pedido(pedido_id)
-        print(f'O Status do pedido: {pedido_id} é CANCELADO')
-        return
+        valor_pago = float(input(f'Valor a ser pago para o pedido {pedido_id} (Valor Total: {pedido.valor_total}): '))
+        if valor_pago < pedido.valor_total:
+            raise ValueError("O valor pago é menor que o valor total. O pedido não pode ser processado.")
+        elif valor_pago > pedido.valor_total:
+            print("O valor pago é maior que o valor total. Ajuste o valor.")
+            return
 
-    metodo_pagamento = input("Método de pagamento (Ex: Cartão, Dinheiro e Pix): ")
+        metodo_pagamento = input("Método de pagamento (Ex: Cartão, Dinheiro, Pix): ")
+        pedido.status = 'Pago'
+        pagamento = Pagamento(pedido_id=pedido.id, valor_pago=valor_pago, metodo_pagamento=metodo_pagamento)
+        session.add(pagamento)
+        session.commit()
+        print(f'O Status do pedido {pedido_id} é PAGO')
+    except ValueError as ve:
+        print(f"Erro: {ve}")
+    except Exception as e:
+        session.rollback()
+        print(f"Erro ao processar pagamento: {e}")
 
-    pedido.status = 'Pago'
-    pagamento = Pagamento(pedido_id=pedido.id, valor_pago=valor_pago, metodo_pagamento=metodo_pagamento)
-    session.commit()
-    print(f'O Status do pedido: {pedido_id} é PAGO')
 
 def excluir_produto(produto_id):
-    produto = session.query(Produto).get(produto_id)
-    if not produto:
-        print("Produto não encontrado.")
-        return
-    
-    session.delete(produto)
-    session.commit()
-    print(f'Produto ID {produto_id} foi excluído.')
+    try:
+        produto = session.query(Produto).get(produto_id)
+        if not produto:
+            raise ValueError("Produto não encontrado.")
+        
+        session.delete(produto)
+        session.commit()
+        print(f'Produto ID {produto_id} foi excluído.')
+    except ValueError as ve:
+        print(f"Erro: {ve}")
+    except Exception as e:
+        session.rollback()
+        print(f"Erro ao excluir produto: {e}")
 
 def cancelar_pedido(id_pedido):
-    pedido = session.query(Pedido).get(id_pedido)
-    if not pedido:
-        print("Pedido não encontrado.")
-        return
+    try:
+        pedido = session.query(Pedido).get(id_pedido)
+        if not pedido:
+            raise ValueError("Pedido não encontrado.")
+        if pedido.status != 'Pendente':
+            raise ValueError("O pedido não pode ser cancelado, pois já foi processado.")
 
-    if pedido.status != 'Pendente':
-        print("O pedido não pode ser cancelado, pois já foi ou esta sendo processado processado.")
-        return
+        if session.query(Pagamento).filter_by(pedido_id=pedido.id).count() == 0:
+            for produto_pedido in pedido.produtos:
+                produto = session.query(Produto).get(produto_pedido.produto_id)
+                produto.estoque += produto_pedido.quantidade
 
-    if session.query(Pagamento).filter_by(pedido_id=pedido.id).count() == 0:
-        for produto_pedido in pedido.produtos:
-            produto = session.query(Produto).get(produto_pedido.produto_id)
-            produto.estoque += produto_pedido.quantidade
-
-        pedido.status = 'Cancelado'
-        session.commit()
-        print(f'Pedido ID {id_pedido} cancelado automaticamente, pois não houve pagamento.')
+            pedido.status = 'Cancelado'
+            session.commit()
+            print(f'Pedido ID {id_pedido} cancelado automaticamente, pois não houve pagamento.')
         else:
             print("Cancelamento do pedido foi abortado.")
+    except ValueError as ve:
+        print(f"Erro: {ve}")
+    except Exception as e:
+        session.rollback()
+        print(f"Erro ao cancelar pedido: {e}")
+
 
 def excluir_conta(cliente_id):
     cliente = session.query(Cliente).get(cliente_id)
@@ -212,8 +246,11 @@ def main():
         print('5. Consultar Pedidos')
         print('6. Consultar Clientes')
         print('7. Atualizar estoque')
-        print('8. Cancelar pedido')
-        print('9. Sair')
+        print('8. Realizar pagamento')
+        print('9. Excluir produto')
+        print('10. Cancelar pedido')
+        print('11. Excluir conta')
+        print('12. Sair')
 
         opcao = input('Opção: ')
         if opcao == '1':
@@ -257,7 +294,7 @@ def main():
             atualizar_estoque(produto_id, nova_quantidade)
         elif opcao == '8':  
             pedido_id = int(input('ID do Pedido a ser pago: '))
-            realizar_pagamento(pedido_id)
+            status_pagamento(pedido_id)
         elif opcao == '9': 
             produto_id = int(input('ID do Produto a ser excluído: '))
             excluir_produto(produto_id)
